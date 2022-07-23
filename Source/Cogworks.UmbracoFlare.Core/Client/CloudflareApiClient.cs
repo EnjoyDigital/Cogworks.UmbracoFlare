@@ -1,14 +1,15 @@
-﻿using Cogworks.UmbracoFlare.Core.Constants;
+﻿using Cogworks.UmbracoFlare.Core.Model;
 using Cogworks.UmbracoFlare.Core.Extensions;
 using Cogworks.UmbracoFlare.Core.Models.Cloudflare;
 using Cogworks.UmbracoFlare.Core.Services;
-using Newtonsoft.Json;
+using System.Text.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace Cogworks.UmbracoFlare.Core.Client
 {
@@ -23,19 +24,20 @@ namespace Cogworks.UmbracoFlare.Core.Client
 
     public class CloudflareApiClient : ICloudflareApiClient
     {
-        private readonly IUmbracoLoggingService _umbracoLoggingService;
-        private readonly IConfigurationService _configurationService;
+        private readonly ILogger<ICloudflareApiClient> logger;
+
+        private readonly IConfigurationService configurationService;
 
 
-        public CloudflareApiClient(IUmbracoLoggingService umbracoLoggingService, IConfigurationService configurationService)
+        public CloudflareApiClient(ILogger<ICloudflareApiClient> logger, IConfigurationService configurationService)
         {
-            _umbracoLoggingService = umbracoLoggingService;
-            _configurationService = configurationService;
+            this.logger = logger;
+            this.configurationService = configurationService;
         }
 
         public UserDetails GetUserDetails()
         {
-            var umbracoFlareConfigModel = _configurationService.LoadConfigurationFile();
+            var umbracoFlareConfigModel = configurationService.LoadConfigurationFile();
             var userDetails = new UserDetails();
 
             if (!umbracoFlareConfigModel.ApiKey.HasValue() || !umbracoFlareConfigModel.AccountEmail.HasValue())
@@ -65,11 +67,11 @@ namespace Cogworks.UmbracoFlare.Core.Client
                 }
                 catch (Exception e)
                 {
-                    _umbracoLoggingService.LogError<ICloudflareApiClient>($"Could not get the user details for user email {umbracoFlareConfigModel.AccountEmail}", e);
+                    logger.LogError($"Could not get the user details for user email {umbracoFlareConfigModel.AccountEmail}", e);
                     return userDetails;
                 }
 
-                _umbracoLoggingService.LogWarn<ICloudflareApiClient>($"The request for <<GetUserDetails>> was not successful for user email {umbracoFlareConfigModel.AccountEmail}");
+                logger.LogWarning($"The request for <<GetUserDetails>> was not successful for user email {umbracoFlareConfigModel.AccountEmail}");
                 return userDetails;
             }
         }
@@ -99,12 +101,12 @@ namespace Cogworks.UmbracoFlare.Core.Client
                         return response.Zones;
                     }
 
-                    _umbracoLoggingService.LogWarn<ICloudflareApiClient>($"Could not get the list of zones because of {response.Messages}");
+                    logger.LogWarning($"Could not get the list of zones because of {response.Messages}");
                     return Enumerable.Empty<Zone>();
                 }
                 catch (Exception e)
                 {
-                    _umbracoLoggingService.LogError<ICloudflareApiClient>("Something went wrong with the request for getting the zones. Could not get the List of zones", e);
+                    logger.LogError("Something went wrong with the request for getting the zones. Could not get the List of zones", e);
                     return Enumerable.Empty<Zone>();
                 }
             }
@@ -115,13 +117,13 @@ namespace Cogworks.UmbracoFlare.Core.Client
             if (!zoneId.HasValue())
             {
                 var zoneIdentifierException = new ArgumentNullException(nameof(zoneId));
-                _umbracoLoggingService.LogError<ICloudflareApiClient>("The zone Identifier is empty", zoneIdentifierException);
+                logger.LogError("The zone Identifier is empty", zoneIdentifierException);
                 return false;
             }
 
             using (var client = new HttpClient())
             {
-                var json = purgeEverything ? "{\"purge_everything\":true}" : $"{{\"files\":{JsonConvert.SerializeObject(urls)}}}";
+                var json = purgeEverything ? "{\"purge_everything\":true}" : $"{{\"files\":{JsonSerializer.Serialize(urls, ApplicationConstants.DefaultJsonSerializerOptions)}}}";
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(ApplicationConstants.ContentTypeApplicationJson));
 
                 var request = new HttpRequestMessage
@@ -142,13 +144,13 @@ namespace Cogworks.UmbracoFlare.Core.Client
 
                     if (!response.Success)
                     {
-                        _umbracoLoggingService.LogWarn<ICloudflareApiClient>($"Something went wrong because of {response.Messages}");
+                        logger.LogWarning($"Something went wrong because of {response.Messages}");
                         return false;
                     }
                 }
                 catch (Exception e)
                 {
-                    _umbracoLoggingService.LogError<ICloudflareApiClient>($"Something went wrong purging the cache. The url that was used is {request.RequestUri}. The json that was used is {json}. The raw string value is {stringVersion}", e);
+                    logger.LogError($"Something went wrong purging the cache. The url that was used is {request.RequestUri}. The json that was used is {json}. The raw string value is {stringVersion}", e);
                     return false;
                 }
 
@@ -158,7 +160,7 @@ namespace Cogworks.UmbracoFlare.Core.Client
 
         private void AddRequestHeaders(HttpRequestMessage request)
         {
-            var umbracoFlareConfigModel = _configurationService.LoadConfigurationFile();
+            var umbracoFlareConfigModel = configurationService.LoadConfigurationFile();
 
             request.Headers.Add("X-Auth-Key", umbracoFlareConfigModel.ApiKey);
             request.Headers.Add("X-Auth-Email", umbracoFlareConfigModel.AccountEmail);

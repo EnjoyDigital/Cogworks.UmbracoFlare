@@ -1,46 +1,38 @@
 ﻿using Cogworks.UmbracoFlare.Core.Client;
 using Cogworks.UmbracoFlare.Core.Extensions;
-using Cogworks.UmbracoFlare.Core.Helpers;
 using Cogworks.UmbracoFlare.Core.Models.Cloudflare;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Umbraco.Core.Models.PublishedContent;
-using Umbraco.Core.Services;
-using Umbraco.Web;
+using Umbraco.Cms.Core.Models.PublishedContent;
+using Umbraco.Cms.Core.Services;
+using Umbraco.Cms.Core.Web;
+using Umbraco.Extensions;
 
 namespace Cogworks.UmbracoFlare.Core.Services
 {
-    public interface IUmbracoFlareDomainService
-    {
-        IEnumerable<string> GetUrlsForNode(int contentId, string currentDomain, bool includeDescendants = false);
-
-        IEnumerable<string> GetAllowedCloudflareDomains();
-
-        IEnumerable<string> GetAllUrlsForWildCardUrls(IEnumerable<string> wildCardUrls);
-
-        Zone GetZoneFilteredByDomain(string domainUrl);
-    }
-
     public class UmbracoFlareDomainService : IUmbracoFlareDomainService
     {
-        private readonly IUmbracoContextFactory _umbracoContextFactory;
-        private readonly ICloudflareApiClient _cloudflareApiClient;
-        private readonly IDomainService _domainService;
-        private readonly IUmbracoLoggingService _umbracoLoggingService;
+        private readonly IUmbracoContextFactory umbracoContextFactory;
+        private readonly ICloudflareApiClient cloudflareApiClient;
+        private readonly IUmbracoFlareUrlService urlService;
+        private readonly IDomainService domainService;
+        private readonly ILogger<UmbracoFlareDomainService> logger;
 
-        public UmbracoFlareDomainService(IUmbracoContextFactory umbracoContextFactory, ICloudflareApiClient cloudflareApiClient, IDomainService domainService, IUmbracoLoggingService umbracoLoggingService)
+        public UmbracoFlareDomainService(IUmbracoContextFactory umbracoContextFactory, ICloudflareApiClient cloudflareApiClient, IUmbracoFlareUrlService urlService, IDomainService domainService, ILogger<UmbracoFlareDomainService> logger)
         {
-            _umbracoContextFactory = umbracoContextFactory;
-            _cloudflareApiClient = cloudflareApiClient;
-            _domainService = domainService;
-            _umbracoLoggingService = umbracoLoggingService;
+            this.umbracoContextFactory = umbracoContextFactory;
+            this.cloudflareApiClient = cloudflareApiClient;
+            this.urlService = urlService;
+            this.domainService = domainService;
+            this.logger = logger;
         }
 
         public IEnumerable<string> GetUrlsForNode(int contentId, string currentDomain, bool includeDescendants = false)
         {
             IPublishedContent content;
-            using (var umbracoContextReference = _umbracoContextFactory.EnsureUmbracoContext())
+            using (var umbracoContextReference = umbracoContextFactory.EnsureUmbracoContext())
             {
                 var contentCache = umbracoContextReference.UmbracoContext.Content;
                 content = contentCache.GetById(contentId);
@@ -52,12 +44,12 @@ namespace Cogworks.UmbracoFlare.Core.Services
             if (includeDescendants)
             {
                 urls.AddRange(content.DescendantsOrSelf().Select(
-                    descendantContent => UmbracoFlareUrlHelper.MakeFullUrlWithDomain(descendantContent.Url(), currentDomain, true))
+                    descendantContent => urlService.MakeFullUrlWithDomain(descendantContent.Url(), currentDomain, true))
                 );
             }
             else
             {
-                urls.Add(UmbracoFlareUrlHelper.MakeFullUrlWithDomain(content.Url(), currentDomain, true));
+                urls.Add(urlService.MakeFullUrlWithDomain(content.Url(), currentDomain, true));
             }
 
             return urls;
@@ -82,7 +74,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
             }
 
             var noZoneException = new Exception($"Could not retrieve the zone from cloudflare with the domain of {domainUrl}");
-            _umbracoLoggingService.LogError<IUmbracoFlareDomainService>(noZoneException.Message, noZoneException);
+            logger.LogError(noZoneException.Message, noZoneException);
 
             return null;
         }
@@ -120,8 +112,8 @@ namespace Cogworks.UmbracoFlare.Core.Services
         {
             var allowedZones = new List<Zone>();
             var allowedDomains = new List<string>();
-            var allZones = _cloudflareApiClient.GetZones();
-            var umbracoDomains = _domainService.GetAll(false).Select(x => new UriBuilder(x.DomainName).Uri.DnsSafeHost).ToList();
+            var allZones = cloudflareApiClient.GetZones();
+            var umbracoDomains = domainService.GetAll(false).Select(x => new UriBuilder(x.DomainName).Uri.DnsSafeHost).ToList();
 
             foreach (var zone in allZones)
             {
@@ -146,7 +138,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
         {
             IEnumerable<IPublishedContent> roots;
 
-            using (var umbracoContextReference = _umbracoContextFactory.EnsureUmbracoContext())
+            using (var umbracoContextReference = umbracoContextFactory.EnsureUmbracoContext())
             {
                 var contentCache = umbracoContextReference.UmbracoContext.Content;
                 roots = contentCache.GetAtRoot();

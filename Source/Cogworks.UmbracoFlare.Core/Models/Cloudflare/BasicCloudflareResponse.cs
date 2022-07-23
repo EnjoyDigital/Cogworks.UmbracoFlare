@@ -1,26 +1,17 @@
 ﻿using System.Collections.Generic;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Cogworks.UmbracoFlare.Core.Models.Cloudflare
 {
     public class BasicCloudflareResponse
     {
-        [JsonProperty(PropertyName = "success")]
+        [JsonPropertyName("success")]
         public bool Success { get; set; }
 
-        [JsonProperty(PropertyName = "errors")]
+        [JsonPropertyName("errors")]
         public List<CloudflareError> Errors { get; set; }
 
-        [JsonProperty(PropertyName = "messages")]
+        [JsonPropertyName("messages")]
         public List<string> Messages { get; set; }
-    }
-
-    public class CloudflareError
-    {
-        [JsonProperty(PropertyName="code")]
-        public int Code { get; set; }
-
-        [JsonProperty(PropertyName = "message")]
-        public string Message { get; set; }
     }
 }

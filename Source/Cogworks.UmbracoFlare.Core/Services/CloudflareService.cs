@@ -1,13 +1,14 @@
 ﻿using Cogworks.UmbracoFlare.Core.Client;
 using Cogworks.UmbracoFlare.Core.Controllers;
 using Cogworks.UmbracoFlare.Core.Extensions;
-using Cogworks.UmbracoFlare.Core.Helpers;
 using Cogworks.UmbracoFlare.Core.Models;
 using Cogworks.UmbracoFlare.Core.Models.Cloudflare;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Umbraco.Core.IO;
+using Umbraco.Cms.Core.Hosting;
+using Umbraco.Cms.Core.IO;
 
 namespace Cogworks.UmbracoFlare.Core.Services
 {
@@ -24,15 +25,22 @@ namespace Cogworks.UmbracoFlare.Core.Services
 
     public class CloudflareService : ICloudflareService
     {
-        private readonly IUmbracoLoggingService _umbracoLoggingService;
-        private readonly ICloudflareApiClient _cloudflareApiClient;
-        private readonly IUmbracoFlareDomainService _umbracoFlareDomainService;
+        private readonly ILogger<CloudflareService> logger;
+        private readonly ICloudflareApiClient cloudflareApiClient;
+        private readonly IUmbracoFlareDomainService umbracoFlareDomainService;
+        private readonly IHostingEnvironment hostingEnvironment;
+        private readonly IUmbracoFlareUrlService urlService;
+        private readonly IUmbracoFlareFileService fileService;
 
-        public CloudflareService(IUmbracoLoggingService umbracoLoggingService, ICloudflareApiClient cloudflareApiClient, IUmbracoFlareDomainService umbracoFlareDomainService)
+        public CloudflareService(ILogger<CloudflareService> logger, ICloudflareApiClient cloudflareApiClient, IUmbracoFlareDomainService umbracoFlareDomainService, IHostingEnvironment hostingEnvironment,
+            IUmbracoFlareUrlService urlService, IUmbracoFlareFileService fileService)
         {
-            _umbracoLoggingService = umbracoLoggingService;
-            _cloudflareApiClient = cloudflareApiClient;
-            _umbracoFlareDomainService = umbracoFlareDomainService;
+            this.logger = logger;
+            this.cloudflareApiClient = cloudflareApiClient;
+            this.umbracoFlareDomainService = umbracoFlareDomainService;
+            this.hostingEnvironment = hostingEnvironment;
+            this.urlService = urlService;
+            this.fileService = fileService;
         }
 
         public StatusWithMessage PurgePages(IEnumerable<string> urls)
@@ -42,15 +50,15 @@ namespace Cogworks.UmbracoFlare.Core.Services
                 return new StatusWithMessage(false, "There were not valid urls to purge, please check if the domain is a valid zone in your cloudflare account");
             }
 
-            var currentDomain = UmbracoFlareUrlHelper.GetCurrentDomain();
-            var websiteZone = _umbracoFlareDomainService.GetZoneFilteredByDomain(currentDomain);
+            var currentDomain = urlService.GetCurrentDomain();
+            var websiteZone = umbracoFlareDomainService.GetZoneFilteredByDomain(currentDomain);
 
             if (websiteZone == null)
             {
                 return new StatusWithMessage(false, $"Could not retrieve the zone from cloudflare with the domain of {currentDomain}");
             }
 
-            var apiResult = _cloudflareApiClient.PurgeCache(websiteZone.Id, urls, false);
+            var apiResult = cloudflareApiClient.PurgeCache(websiteZone.Id, urls, false);
 
             return apiResult
                 ? new StatusWithMessage(true, "The values were purged successfully")
@@ -59,7 +67,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
 
         public StatusWithMessage PurgeEverything(string currentDomain)
         {
-            var websiteZone = _umbracoFlareDomainService.GetZoneFilteredByDomain(currentDomain);
+            var websiteZone = umbracoFlareDomainService.GetZoneFilteredByDomain(currentDomain);
 
             if (websiteZone == null)
             {
@@ -68,7 +76,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
                     $"We could not purge the cache because the domain {currentDomain} is not valid with the provided credentials. Please ensure this domain is registered under these credentials on your cloudflare dashboard.");
             }
 
-            var purgeCacheStatus = _cloudflareApiClient.PurgeCache(websiteZone.Id, Enumerable.Empty<string>(), true);
+            var purgeCacheStatus = cloudflareApiClient.PurgeCache(websiteZone.Id, Enumerable.Empty<string>(), true);
 
             return purgeCacheStatus
                 ? new StatusWithMessage(true, $"Your current domain {currentDomain} was purged successfully.")
@@ -77,23 +85,23 @@ namespace Cogworks.UmbracoFlare.Core.Services
 
         public UserDetails GetCloudflareUserDetails()
         {
-            return _cloudflareApiClient.GetUserDetails();
+            return cloudflareApiClient.GetUserDetails();
         }
 
         public IEnumerable<string> GetFilePaths(IEnumerable<string> filesOrFolders)
         {
-            var rootOfApplication = IOHelper.MapPath("~/");
+            var rootOfApplication = hostingEnvironment.MapPathWebRoot("~/");
             var filePaths = new List<string>();
             var filesOrFoldersTest = filesOrFolders.HasAny() ? filesOrFolders.Where(x => x.HasValue()) : Enumerable.Empty<string>();
 
             foreach (var fileOrFolder in filesOrFoldersTest)
             {
-                var fileOrFolderPath = IOHelper.MapPath(fileOrFolder);
+                var fileOrFolderPath = hostingEnvironment.MapPathWebRoot(fileOrFolder);
                 var fileAttributes = File.GetAttributes(fileOrFolderPath);
 
                 if (fileAttributes.Equals(FileAttributes.Directory))
                 {
-                    var filesInTheFolder = UmbracoFlareFileHelper.GetFilesIncludingSubDirs(fileOrFolderPath);
+                    var filesInTheFolder = fileService.GetFilesIncludingSubDirs(fileOrFolderPath);
                     var files = filesInTheFolder.Where(x => x.HasValue());
 
                     foreach (var file in files)
@@ -110,7 +118,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
                 {
                     if (!File.Exists(fileOrFolderPath))
                     {
-                        _umbracoLoggingService.LogWarn<CloudflareUmbracoApiController>($"Could not find file with the path {fileOrFolderPath}");
+                        logger.LogWarning($"Could not find file with the path {fileOrFolderPath}");
                         continue;
                     }
 

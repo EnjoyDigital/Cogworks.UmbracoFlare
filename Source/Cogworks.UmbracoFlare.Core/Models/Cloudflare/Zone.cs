@@ -1,20 +1,20 @@
 ﻿using System.Collections.Generic;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Cogworks.UmbracoFlare.Core.Models.Cloudflare
 {
     public class Zone
     {
-        [JsonProperty(PropertyName = "id")]
+        [JsonPropertyName("id")]
         public string Id { get; set; }
 
-        [JsonProperty(PropertyName = "name")]
+        [JsonPropertyName("name")]
         public string Name { get; set; }
 
-        [JsonProperty(PropertyName="development_mode")]
+        [JsonPropertyName("development_mode")]
         public bool DevelopmentMode { get; set; }
 
-        [JsonProperty(PropertyName="name_servers")]
+        [JsonPropertyName("name_servers")]
         public List<string> NameServers { get; set; }
     }
 }

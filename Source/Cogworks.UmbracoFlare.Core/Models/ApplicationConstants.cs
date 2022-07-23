@@ -1,7 +1,15 @@
-﻿namespace Cogworks.UmbracoFlare.Core.Constants
+﻿using System.Text.Json;
+
+namespace Cogworks.UmbracoFlare.Core.Model
 {
     public static class ApplicationConstants
     {
+        public static readonly JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        };
+
         public const string ContentTypeApplicationJson = "application/json";
         public static readonly string[] AllowedFileExtensions = { ".css", ".js", ".jpg", ".png", ".gif", ".aspx", ".html" };
         public const string ImageCropperPropertyEditorAlias = "Umbraco.ImageCropper";

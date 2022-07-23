@@ -1,47 +1,47 @@
 ﻿using System;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Cogworks.UmbracoFlare.Core.Models.Cloudflare
 {
     public class UserDetails : BasicCloudflareResponse
     {
-        [JsonProperty(PropertyName="result")]
+        [JsonPropertyName("result")]
         public UserDetailResult Result { get; set; }
     }
 
     public class UserDetailResult
     {
-        [JsonProperty(PropertyName="email")]
+        [JsonPropertyName("email")]
         public string Email { get; set; }
 
-        [JsonProperty(PropertyName="first_name")]
+        [JsonPropertyName("first_name")]
         public string FirstName{ get; set; }
 
-        [JsonProperty(PropertyName="last_name")]
+        [JsonPropertyName("last_name")]
         public string LastName { get; set; }
 
-        [JsonProperty(PropertyName="username")]
+        [JsonPropertyName("username")]
         public string Username { get; set; }
 
-        [JsonProperty(PropertyName="telephone")]
+        [JsonPropertyName("telephone")]
         public string Telephone { get; set; }
 
-        [JsonProperty(PropertyName="country")]
+        [JsonPropertyName("country")]
         public string Country { get; set; }
 
-        [JsonProperty(PropertyName="zipcode")]
+        [JsonPropertyName("zipcode")]
         public string Zipcode { get; set; }
 
-        [JsonProperty(PropertyName="created_on")]
+        [JsonPropertyName("created_on")]
         public DateTime CreatedOn { get; set; }
 
-        [JsonProperty(PropertyName="modified_on")]
+        [JsonPropertyName("modified_on")]
         public DateTime ModifiedOn { get; set; }
 
-        [JsonProperty(PropertyName="api_key")]
+        [JsonPropertyName("api_key")]
         public string ApiKey { get; set; }
 
-        [JsonProperty(PropertyName="two_factor_authentication_enabled")]
+        [JsonPropertyName("two_factor_authentication_enabled")]
         public bool TwoFactorAuthenticationEnabled { get; set; }
     }
 }

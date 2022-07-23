@@ -1,44 +1,46 @@
-﻿using Cogworks.UmbracoFlare.Core.Constants;
-using Cogworks.UmbracoFlare.Core.Extensions;
+﻿using Cogworks.UmbracoFlare.Core.Extensions;
 using Cogworks.UmbracoFlare.Core.Helpers;
+using Cogworks.UmbracoFlare.Core.Model;
 using Cogworks.UmbracoFlare.Core.Models;
 using Cogworks.UmbracoFlare.Core.Models.Api;
 using Cogworks.UmbracoFlare.Core.Services;
+using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Web.Http;
-using Umbraco.Web.Mvc;
-using Umbraco.Web.WebApi;
+using Umbraco.Cms.Web.Common.Attributes;
+using Umbraco.Cms.Web.Common.Controllers;
 
 namespace Cogworks.UmbracoFlare.Core.Controllers
 {
     [PluginController("UmbracoFlare")]
-    public class CloudflareUmbracoApiController : UmbracoAuthorizedApiController
+    public class CloudflareUmbracoApiController : UmbracoApiController
     {
-        private readonly ICloudflareService _cloudflareService;
-        private readonly IUmbracoFlareDomainService _umbracoFlareDomainService;
-        private readonly IConfigurationService _configurationService;
+        private readonly ICloudflareService cloudflareService;
+        private readonly IUmbracoFlareDomainService domainService;
+        private readonly IUmbracoFlareUrlService urlService;
+        private readonly IConfigurationService configurationService;
 
-        public CloudflareUmbracoApiController(ICloudflareService cloudflareService, IConfigurationService configurationService, IUmbracoFlareDomainService umbracoFlareDomainService)
+        public CloudflareUmbracoApiController(ICloudflareService cloudflareService, IConfigurationService configurationService, IUmbracoFlareDomainService domainService, IUmbracoFlareUrlService urlService)
         {
-            _cloudflareService = cloudflareService;
-            _configurationService = configurationService;
-            _umbracoFlareDomainService = umbracoFlareDomainService;
+            this.cloudflareService = cloudflareService;
+            this.configurationService = configurationService;
+            this.domainService = domainService;
+            this.urlService = urlService;
         }
 
         [HttpGet]
         public UmbracoFlareConfigModel GetConfig()
         {
-            var configurationFile = _configurationService.LoadConfigurationFile();
-            if (!_configurationService.ConfigurationFileHasData(configurationFile))
+            var configurationFile = configurationService.LoadConfigurationFile();
+            if (!configurationService.ConfigurationFileHasData(configurationFile))
             {
                 return configurationFile;
             }
 
-            var userDetails = _cloudflareService.GetCloudflareUserDetails();
+            var userDetails = cloudflareService.GetCloudflareUserDetails();
             configurationFile.CredentialsAreValid = userDetails != null && userDetails.Success;
-            configurationFile.AllowedDomains = _umbracoFlareDomainService.GetAllowedCloudflareDomains();
+            configurationFile.AllowedDomains = domainService.GetAllowedCloudflareDomains();
 
             return configurationFile;
         }
@@ -46,26 +48,26 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
         [HttpPost]
         public UmbracoFlareConfigModel UpdateConfigStatus([FromBody] UmbracoFlareConfigModel config)
         {
-            var configurationFile = _configurationService.SaveConfigurationFile(config);
-            var userDetails = _cloudflareService.GetCloudflareUserDetails();
+            var configurationFile = configurationService.SaveConfigurationFile(config);
+            var userDetails = cloudflareService.GetCloudflareUserDetails();
             configurationFile.CredentialsAreValid = userDetails != null && userDetails.Success;
 
-            configurationFile = _configurationService.SaveConfigurationFile(config);
+            configurationFile = configurationService.SaveConfigurationFile(config);
 
             return configurationFile;
         }
 
         [HttpPost]
-        public StatusWithMessage PurgeAll([FromUri] string currentDomain)
+        public StatusWithMessage PurgeAll([FromQuery]string currentDomain)
         {
-            var currentDomainIsValid = _umbracoFlareDomainService.GetAllowedCloudflareDomains().Count(x => x.Equals(currentDomain)) > 0;
+            var currentDomainIsValid = domainService.GetAllowedCloudflareDomains().Count(x => x.Equals(currentDomain)) > 0;
 
             if (!currentDomainIsValid)
             {
                 return new StatusWithMessage(false, "The current domain is not valid, please check if the domain is a valid zone in your cloudflare account.");
             }
 
-            var result = _cloudflareService.PurgeEverything(currentDomain);
+            var result = cloudflareService.PurgeEverything(currentDomain);
             return result;
         }
 
@@ -77,7 +79,7 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
                 return new StatusWithMessage(false, "There were not static files selected to purge");
             }
 
-            var currentDomainIsValid = _umbracoFlareDomainService.GetAllowedCloudflareDomains().Count(x => x.Equals(model.CurrentDomain)) > 0;
+            var currentDomainIsValid = domainService.GetAllowedCloudflareDomains().Count(x => x.Equals(model.CurrentDomain)) > 0;
 
             if (!currentDomainIsValid)
             {
@@ -85,7 +87,7 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
             }
             
             var fullUrlsToPurge = new List<string>();
-            var allFilePaths = _cloudflareService.GetFilePaths(model.StaticFiles);
+            var allFilePaths = cloudflareService.GetFilePaths(model.StaticFiles);
 
             foreach (var filePath in allFilePaths)
             {
@@ -93,12 +95,12 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
 
                 if (ApplicationConstants.AllowedFileExtensions.Contains(extension))
                 {
-                    var urls = UmbracoFlareUrlHelper.GetFullUrlForPurgeStaticFiles(filePath, model.CurrentDomain, true);
+                    var urls = urlService.GetFullUrlForPurgeStaticFiles(filePath, model.CurrentDomain, true);
                     fullUrlsToPurge.AddRange(urls);
                 }
             }
 
-            var result = _cloudflareService.PurgePages(fullUrlsToPurge);
+            var result = cloudflareService.PurgePages(fullUrlsToPurge);
             
             return !result.Success ? result : new StatusWithMessage(true, $"{fullUrlsToPurge.Count()} static files were purged successfully.");
         }
@@ -111,7 +113,7 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
                 return new StatusWithMessage(false, "You must provide urls to clear the cache for.");
             }
 
-            var currentDomainIsValid = _umbracoFlareDomainService.GetAllowedCloudflareDomains().Count(x => x.Equals(model.CurrentDomain)) > 0;
+            var currentDomainIsValid = domainService.GetAllowedCloudflareDomains().Count(x => x.Equals(model.CurrentDomain)) > 0;
 
             if (!currentDomainIsValid)
             {
@@ -119,16 +121,16 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
             }
             
             var builtUrls = new List<string>();
-            builtUrls.AddRange(UmbracoFlareUrlHelper.MakeFullUrlsWithDomain(model.Urls, model.CurrentDomain, true));
+            builtUrls.AddRange(urlService.MakeFullUrlsWithDomain(model.Urls, model.CurrentDomain, true));
             
             var urlsWithWildCards = builtUrls.Where(x => x.Contains('*'));
             var willCardsUrls = !urlsWithWildCards.HasAny()
                 ? builtUrls
-                : _umbracoFlareDomainService.GetAllUrlsForWildCardUrls(urlsWithWildCards);
+                : domainService.GetAllUrlsForWildCardUrls(urlsWithWildCards);
 
             builtUrls.AddRangeUnique(willCardsUrls);
 
-            var result = _cloudflareService.PurgePages(builtUrls);
+            var result = cloudflareService.PurgePages(builtUrls);
 
             return !result.Success ? result : new StatusWithMessage(true, $"{builtUrls.Count()} urls purged successfully.");
         }
@@ -141,7 +143,7 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
                 return new StatusWithMessage(false, "You must provide a node id.");
             }
 
-            var currentDomainIsValid = _umbracoFlareDomainService.GetAllowedCloudflareDomains().Count(x => x.Equals(model.CurrentDomain)) > 0;
+            var currentDomainIsValid = domainService.GetAllowedCloudflareDomains().Count(x => x.Equals(model.CurrentDomain)) > 0;
 
             if (!currentDomainIsValid)
             {
@@ -150,9 +152,9 @@ namespace Cogworks.UmbracoFlare.Core.Controllers
             }
 
             var urls = new List<string>();
-            urls.AddRange(_umbracoFlareDomainService.GetUrlsForNode(model.NodeId, model.CurrentDomain, model.PurgeChildren));
+            urls.AddRange(domainService.GetUrlsForNode(model.NodeId, model.CurrentDomain, model.PurgeChildren));
 
-            var result = _cloudflareService.PurgePages(urls);
+            var result = cloudflareService.PurgePages(urls);
 
             return !result.Success ? result : new StatusWithMessage(true, $"{urls.Count()} urls purged successfully.");
         }

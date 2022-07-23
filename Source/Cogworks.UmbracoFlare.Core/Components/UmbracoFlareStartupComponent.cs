@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Net;
-using Umbraco.Core.Composing;
+using Umbraco.Cms.Core.Composing;
 
 namespace Cogworks.UmbracoFlare.Core.Components
 {

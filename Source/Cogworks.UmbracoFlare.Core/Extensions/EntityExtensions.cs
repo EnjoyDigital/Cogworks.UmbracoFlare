@@ -1,4 +1,4 @@
-﻿using Umbraco.Core.Models.Entities;
+﻿using Umbraco.Cms.Core.Models.Entities;
 
 namespace Cogworks.UmbracoFlare.Core.Extensions
 {

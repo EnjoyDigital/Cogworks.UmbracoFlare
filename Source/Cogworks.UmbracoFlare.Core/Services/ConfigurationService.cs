@@ -1,10 +1,11 @@
-﻿using Cogworks.UmbracoFlare.Core.Constants;
+﻿using Cogworks.UmbracoFlare.Core.Model;
 using Cogworks.UmbracoFlare.Core.Extensions;
 using Cogworks.UmbracoFlare.Core.Models;
 using System;
 using System.IO;
-using System.Web;
 using System.Xml.Serialization;
+using Umbraco.Cms.Core.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Cogworks.UmbracoFlare.Core.Services
 {
@@ -19,11 +20,13 @@ namespace Cogworks.UmbracoFlare.Core.Services
 
     public class ConfigurationService : IConfigurationService
     {
-        private readonly IUmbracoLoggingService _umbracoLoggingService;
+        private readonly ILogger<IConfigurationService> logger;
+        private readonly IHostingEnvironment hostingEnvironmen;
 
-        public ConfigurationService(IUmbracoLoggingService umbracoLoggingService)
+        public ConfigurationService(ILogger<IConfigurationService> logger, IHostingEnvironment hostingEnvironmen)
         {
-            _umbracoLoggingService = umbracoLoggingService;
+            this.logger = logger;
+            this.hostingEnvironmen = hostingEnvironmen;
         }
 
         public bool ConfigurationFileHasData(UmbracoFlareConfigModel configurationFile)
@@ -35,7 +38,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
         {
             try
             {
-                var configurationFilePath = HttpContext.Current.Server.MapPath(ApplicationConstants.ConfigurationFile.ConfigurationFilePath);
+                var configurationFilePath = hostingEnvironmen.MapPathWebRoot(ApplicationConstants.ConfigurationFile.ConfigurationFilePath);
                 var serializer = new XmlSerializer(typeof(UmbracoFlareConfigModel));
 
                 using (var reader = new StreamReader(configurationFilePath))
@@ -45,7 +48,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
             }
             catch (Exception e)
             {
-                _umbracoLoggingService.LogError<IConfigurationService>($"Could not load the file in this path {ApplicationConstants.ConfigurationFile.ConfigurationFilePath}", e);
+                logger.LogError($"Could not load the file in this path {ApplicationConstants.ConfigurationFile.ConfigurationFilePath}", e);
             }
 
             return new UmbracoFlareConfigModel();
@@ -55,7 +58,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
         {
             try
             {
-                var configurationFilePath = HttpContext.Current.Server.MapPath(ApplicationConstants.ConfigurationFile.ConfigurationFilePath);
+                var configurationFilePath = (ApplicationConstants.ConfigurationFile.ConfigurationFilePath);
                 var serializer = new XmlSerializer(typeof(UmbracoFlareConfigModel));
 
                 using (var writer = new StreamWriter(configurationFilePath))
@@ -67,7 +70,7 @@ namespace Cogworks.UmbracoFlare.Core.Services
             }
             catch (Exception e)
             {
-                _umbracoLoggingService.LogError<IConfigurationService>($"Could not save the configuration file in this path {ApplicationConstants.ConfigurationFile.ConfigurationFilePath}", e);
+                logger.LogError($"Could not save the configuration file in this path {ApplicationConstants.ConfigurationFile.ConfigurationFilePath}", e);
             }
 
             return null;

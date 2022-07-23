@@ -1,9 +1,9 @@
-﻿using Cogworks.UmbracoFlare.Core.Constants;
+﻿using Cogworks.UmbracoFlare.Core.Model;
 using Cogworks.UmbracoFlare.Core.Extensions;
 using System.Collections.Generic;
 using System.Linq;
-using Umbraco.Core.PropertyEditors;
-using Umbraco.Core.Services;
+using Umbraco.Cms.Core.PropertyEditors;
+using Umbraco.Cms.Core.Services;
 
 namespace Cogworks.UmbracoFlare.Core.Services
 {

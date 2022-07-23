@@ -1,21 +1,27 @@
 ﻿using Cogworks.UmbracoFlare.Core.Extensions;
+using Cogworks.UmbracoFlare.Core.Services;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Umbraco.Core.IO;
+using Umbraco.Cms.Core.Hosting;
 
 namespace Cogworks.UmbracoFlare.Core.Helpers
 {
-    public static class UmbracoFlareFileHelper
+    public class UmbracoFlareFileService : IUmbracoFlareFileService
     {
-        private static readonly IEnumerable<string> ExcludedPaths = new List<string> { "app_data", "app_browsers", "app_data", "app_code", "app_plugins", "properties", "bin", "config", "media", "obj", "umbraco", "views" };
-        private static readonly IEnumerable<string> ExcludedExtensions = new List<string> { ".config", ".asax", ".user", ".nuspec", ".dll", ".pdb", ".lic", ".csproj" };
+        private readonly IEnumerable<string> ExcludedPaths = new List<string> { "app_data", "app_browsers", "app_data", "app_code", "app_plugins", "properties", "bin", "config", "media", "obj", "umbraco", "views" };
+        private readonly IEnumerable<string> ExcludedExtensions = new List<string> { ".config", ".asax", ".user", ".nuspec", ".dll", ".pdb", ".lic", ".csproj" };
+        private readonly IHostingEnvironment hostingEnvironment;
 
-        public static IEnumerable<DirectoryInfo> GetFolders(string folder)
+        public UmbracoFlareFileService(IHostingEnvironment hostingEnvironment)
         {
-            var path = IOHelper.MapPath("~/" + folder.TrimStart('~', '/'));
+            this.hostingEnvironment = hostingEnvironment;
+        }
+        public IEnumerable<DirectoryInfo> GetFolders(string folder)
+        {
+            var path = hostingEnvironment.MapPathWebRoot("~/" + folder.TrimStart('~', '/'));
             var directory = new DirectoryInfo(path);
-            
+
             if (!directory.Exists)
             {
                 return Enumerable.Empty<DirectoryInfo>();
@@ -27,9 +33,9 @@ namespace Cogworks.UmbracoFlare.Core.Helpers
             return allowedDirectories;
         }
 
-        public static IEnumerable<FileInfo> GetFiles(string folder)
+        public IEnumerable<FileInfo> GetFiles(string folder)
         {
-            var path = IOHelper.MapPath("~/" + folder.TrimStart('~', '/'));
+            var path = hostingEnvironment.MapPathWebRoot("~/" + folder.TrimStart('~', '/'));
             var directory = new DirectoryInfo(path);
 
             if (!directory.Exists)
@@ -41,8 +47,8 @@ namespace Cogworks.UmbracoFlare.Core.Helpers
 
             return files;
         }
-        
-        public static IEnumerable<FileInfo> GetFilesIncludingSubDirs(string path)
+
+        public IEnumerable<FileInfo> GetFilesIncludingSubDirs(string path)
         {
             var queue = new Queue<string>();
             queue.Enqueue(path);
